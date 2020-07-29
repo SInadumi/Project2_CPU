@@ -1,9 +1,16 @@
 # Makefile cpu
 
+# CC := gcc
+# CFLAGS := -g -Wall -Wextra
+
+# main:  cpuboard.o main.o
+
+# cpuboard.o main.o: cpuboard.h
+
 PROGRAM = cpu
 OBJS = main.o cpuboard.o
 CC = gcc
-CFLAGS = -Wall -O2
+CFLAGS = -g -Wall -Wextra
 
 $(PROGRAM): $(OBJS)
 	$(CC) -o $(PROGRAM) $^

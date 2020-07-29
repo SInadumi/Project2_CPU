@@ -15,9 +15,9 @@ static Uword instruction_decoding(Uword ir);
 #define NOP 0x00
 #define HLT 0x0f
 #define OUT 0x10
-#define IN 	0x18
+#define IN 	0x1f
 #define RCF 0x20
-#define SCF 0x28
+#define SCF 0x2f
 #define LD	0x60
 #define ST	0x70
 #define ADD	0xb0
@@ -44,12 +44,15 @@ int step(Cpub *cpub)
 	 *   [ return RUN_STEP or RUN_HALT ]
 	 */
 	int RUN_Return = RUN_STEP;
-	fprintf(stderr, "cf=%hhu, vf=%hhu, nf=%hhu, zf=%hhu \n", cpub->cf, cpub->vf, cpub->nf,cpub->zf);
+	//fprintf(stderr, "cf=%hhu, vf=%hhu, nf=%hhu, zf=%hhu \n", cpub->cf, cpub->vf, cpub->nf,cpub->zf);
+
 	/* P0 Phase */
 	cpub->mar = cpub->pc;
 	cpub->pc++;
+
 	/* P1 Phase */
-	cpub->ir = cpub->mem[0x000 + cpub->mar];	//Program領域へのアクセス
+	cpub->ir = (Uword)cpub->mem[0x000 + cpub->mar];	//Program領域へのアクセス
+	
 	/* 命令語の解析 */
 	Uword ir = instruction_decoding(cpub->ir);
 
@@ -85,12 +88,12 @@ int step(Cpub *cpub)
 		case Bbc:
 			fprintf(stderr, "execute Bbc\n");
 			break;
-		case Ssm:
-			fprintf(stderr, "execute Ssm\n");
-			break;
-		case Rsm:
-			fprintf(stderr, "execute Rsm\n");
-			break;
+		// case Ssm:
+		// 	fprintf(stderr, "execute Ssm\n");
+		// 	break;
+		// case Rsm:
+		// 	fprintf(stderr, "execute Rsm\n");
+		// 	break;
 		case LD:
 			fprintf(stderr, "execute LD\n");
 			break;
@@ -140,6 +143,8 @@ static Uword instruction_decoding(Uword ir){
 	Uword mask_lower4 = 0x0f;
 	Uword inst_code_lower4 = ir & mask_lower4;
 
+	fprintf(stderr, "upper:%x, lower:%x",inst_code_upper4,inst_code_lower4);
+
 	switch (inst_code_upper4)
 	{
 	case 0x00:
@@ -152,78 +157,78 @@ static Uword instruction_decoding(Uword ir){
 		else if((ir & 0x08) == 1) Decode_Return = HLT;
 		break;
 
-	case 0x01:
+	case 0x10:
 		/* OUT,IN */
 		// 下位4bit目を取り出す
 		if((inst_code_lower4 & 0x08) == 0) Decode_Return = OUT;
 		else if((inst_code_lower4 & 0x08) == 1) Decode_Return = IN;
 		break;
 
-	case 0x02:
+	case 0x20:
 		/* RCF,SCF */
 		// 下位4bit目を取り出す
 		if((inst_code_lower4 & 0x08) == 0) Decode_Return = RCF;
 		else if((inst_code_lower4 & 0x08) == 1) Decode_Return = SCF;
 		break;
 
-	case 0x03:
+	case 0x30:
 		/* Bbc */
 		Decode_Return = Bbc;
 		break;
 
-	case 0x04:
-		/* Ssm,Rsm */
-		//下位3bit目を取り出す
-		if((inst_code_lower4 & 0x04) == 0) Decode_Return = Ssm;
-		else if((inst_code_lower4 & 0x04) == 1) Decode_Return = Rsm;
-		break;
+	// case 0x40:
+	// 	/* Ssm,Rsm */
+	// 	//下位3bit目を取り出す
+	// 	if((inst_code_lower4 & 0x4) == 0) Decode_Return = Ssm;
+	// 	else if((inst_code_lower4 & 0x4) == 1) Decode_Return = Rsm;
+	// 	break;
 
-	case 0x06:
+	case 0x60:
 		/* LD */
 		Decode_Return = LD;
 		break;
 
-	case 0x07:
+	case 0x70:
 		/* ST */
 		Decode_Return = ST;
 		break;
 
-	case 0x08:
+	case 0x80:
 		/* SBC */
 		Decode_Return = SBC;
 		break;
 
-	case 0x09:
+	case 0x90:
 		/* ADC */
 		Decode_Return = ADC;
 		break;
 
-	case 0x0a:
+	case 0xa0:
 		/* SUB */
 		Decode_Return = SUB;
 		break;
 
-	case 0x0b:
+	case 0xb0:
 		/* ADD */
 		Decode_Return = ADD;
 		break;
 
-	case 0x0c:
+	case 0xc0:
 		/*EOR */
 		Decode_Return = EOR;
 		break;
 
-	case 0x0d:
+	case 0xd0:
 		/* OR */
 		Decode_Return = OR;
 		break;
 
-	case 0x0e:
+	case 0xe0:
 		/* AND */
 		Decode_Return = AND;
 		break;
 
-	case 0x0f:
+	case 0xf0:
 		/* CMP */
 		Decode_Return = CMP;
 		break;
