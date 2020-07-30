@@ -6,33 +6,18 @@
  *	Descrioption:	simulation(emulation) of an instruction
  */
 #include	<stdio.h>
+#include 	<string.h>
 #include	"cpuboard.h"
 
 /* 各種変数・関数の定義 */
-static Uword instruction_decoding(Uword ir);
+Uword A_Instruction;	/* 1語目Aの命令 */
+Uword B_Instruction;	/* 1語目Bの命令 */
+Uword sm;				/* Shift mode */
+Uword bc;				/* Branch Condition */
 
-/* 命令語コード定義(1語目:16bit) */
-#define NOP 0x00
-#define HLT 0x0f
-#define OUT 0x10
-#define IN 	0x1f
-#define RCF 0x20
-#define SCF 0x2f
-#define LD	0x60
-#define ST	0x70
-#define ADD	0xb0
-#define ADC	0x90
-#define SUB	0xa0
-#define SBC	0x80
-#define CMP	0xf0
-#define AND	0xe0
-#define OR	0xd0
-#define EOR	0xc0
-#define Ssm	0x40
-#define Rsm	0x40+0x04
-#define Bbc	0x30
-#define JAL	0x0a
-#define JR	0x0b
+int ST_Instruction(Cpub *);
+Uword instruction_decoding(Uword ir);
+Uword Set_A_Value(char *Instruction_name, Cpub *);
 
 /*=============================================================================
  *   Simulation of a Single Instruction
@@ -44,20 +29,19 @@ int step(Cpub *cpub)
 	 *   [ return RUN_STEP or RUN_HALT ]
 	 */
 	int RUN_Return = RUN_STEP;
-	//fprintf(stderr, "cf=%hhu, vf=%hhu, nf=%hhu, zf=%hhu \n", cpub->cf, cpub->vf, cpub->nf,cpub->zf);
 
 	/* P0 Phase */
 	cpub->mar = cpub->pc;
 	cpub->pc++;
 
 	/* P1 Phase */
-	cpub->ir = (Uword)cpub->mem[0x000 + cpub->mar];	//Program領域へのアクセス
-	
+	cpub->ir = (Uword)cpub->mem[0x000 + cpub->mar];		//Program領域へのアクセス
+
 	/* 命令語の解析 */
-	Uword ir = instruction_decoding(cpub->ir);
+	Uword IR = instruction_decoding(cpub->ir);
 
 	/* 分岐処理 */
-	switch(ir)
+	switch(IR)
 	{
 		case NOP:
 			fprintf(stderr, "execute NOP\n");
@@ -99,6 +83,8 @@ int step(Cpub *cpub)
 			break;
 		case ST:
 			fprintf(stderr, "execute ST\n");
+			RUN_Return = ST_Instruction(cpub);
+			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: ST Instruction\n");
 			break;
 		case SBC:
 			fprintf(stderr, "execute SBC\n");
@@ -133,23 +119,71 @@ int step(Cpub *cpub)
 	return RUN_Return;
 }
 
+/* ST命令 */
+int ST_Instruction(Cpub *cpub){	
+	Uword Second_word;
+	Uword A_Value = Set_A_Value("ST", cpub);		/* 1 -> IX, 0 -> ACC */
+
+	/* P2 Phase */
+	cpub->mar = cpub->pc;
+	cpub->pc++;
+	Second_word = cpub->mem[0x000 + cpub->mar];
+
+	/* P3 Phase */
+	switch (B_Instruction)
+	{
+	case Program_Absolute_d :
+		cpub->mar = Second_word;
+		/* P4 Phase */
+		cpub->mem[0x000 + cpub->mar] = A_Value;
+		break;
+
+	case Data_Absolute_d :
+		cpub->mar = Second_word;
+		/* P4 Phase */
+		cpub->mem[0x100 + cpub->mar] = A_Value;
+		break;
+
+	case Program_IX :
+		cpub->mar = Second_word + cpub->ix;
+		/* P4 Phase */
+		cpub->mem[0x000 + cpub->mar] = A_Value;
+		break;
+
+	case Data_IX :
+		cpub->mar = Second_word + cpub->ix;
+		/* P4 Phase */
+		cpub->mem[0x100 + cpub->mar] = A_Value;
+		break;
+
+	default:
+		fprintf(stderr,"Error: OP_B was not defined in ST Instruction\n");
+		return RUN_HALT;
+		break;
+	}
+	return RUN_STEP;
+}
+
 /* 命令解読を行う関数 */
-static Uword instruction_decoding(Uword ir){
+Uword instruction_decoding(Uword ir){
+
 	Uword Decode_Return = NOP;
+
 	/* 上位4bitの取り出し */
 	Uword mask_upper4 = 0xf0;
 	Uword inst_code_upper4 = ir & mask_upper4;
+
 	/* 下位4bitの取り出し */
 	Uword mask_lower4 = 0x0f;
 	Uword inst_code_lower4 = ir & mask_lower4;
-
-	fprintf(stderr, "upper:%x, lower:%x",inst_code_upper4,inst_code_lower4);
 
 	switch (inst_code_upper4)
 	{
 	case 0x00:
 		/* NOP,HLT,JAL,JR */
-		if(ir == JAL) Decode_Return = JAL;
+		if(ir == JAL){
+			Decode_Return = JAL;
+		}
 		else if(ir == JR) Decode_Return = JR;
 		
 		// 下位4bit目を取り出す
@@ -174,70 +208,106 @@ static Uword instruction_decoding(Uword ir){
 	case 0x30:
 		/* Bbc */
 		Decode_Return = Bbc;
+		bc = inst_code_lower4 & 0x15;
 		break;
 
-	// case 0x40:
-	// 	/* Ssm,Rsm */
-	// 	//下位3bit目を取り出す
-	// 	if((inst_code_lower4 & 0x4) == 0) Decode_Return = Ssm;
-	// 	else if((inst_code_lower4 & 0x4) == 1) Decode_Return = Rsm;
-	// 	break;
+	case 0x40:
+		// /* Ssm,Rsm */
+		// //下位3bit目を取り出す
+		// if((inst_code_lower4 & 0x04) == 0) Decode_Return = Ssm;
+		// else if((inst_code_lower4 & 0x04) == 1) Decode_Return = Rsm;
+		// break;
 
 	case 0x60:
 		/* LD */
 		Decode_Return = LD;
+		A_Instruction = inst_code_lower4 & 0x08;
+		B_Instruction = inst_code_lower4 & 0x07;
 		break;
 
 	case 0x70:
 		/* ST */
 		Decode_Return = ST;
+		A_Instruction = inst_code_lower4 & 0x08;
+		B_Instruction = inst_code_lower4 & 0x07;
+		//fprintf(stderr,"A:%x, B:%x\n",A_Instruction,B_Instruction);
 		break;
 
 	case 0x80:
 		/* SBC */
 		Decode_Return = SBC;
+		A_Instruction = inst_code_lower4 & 0x08;
+		B_Instruction = inst_code_lower4 & 0x07;
 		break;
 
 	case 0x90:
 		/* ADC */
 		Decode_Return = ADC;
+		A_Instruction = inst_code_lower4 & 0x08;
+		B_Instruction = inst_code_lower4 & 0x07;
 		break;
 
 	case 0xa0:
 		/* SUB */
 		Decode_Return = SUB;
+		A_Instruction = inst_code_lower4 & 0x08;
+		B_Instruction = inst_code_lower4 & 0x07;
 		break;
 
 	case 0xb0:
 		/* ADD */
 		Decode_Return = ADD;
+		A_Instruction = inst_code_lower4 & 0x08;
+		B_Instruction = inst_code_lower4 & 0x07;
 		break;
 
 	case 0xc0:
 		/*EOR */
 		Decode_Return = EOR;
+		A_Instruction = inst_code_lower4 & 0x08;
+		B_Instruction = inst_code_lower4 & 0x07;
 		break;
 
 	case 0xd0:
 		/* OR */
 		Decode_Return = OR;
+		A_Instruction = inst_code_lower4 & 0x08;
+		B_Instruction = inst_code_lower4 & 0x07;
 		break;
 
 	case 0xe0:
 		/* AND */
 		Decode_Return = AND;
+		A_Instruction = inst_code_lower4 & 0x08;
+		B_Instruction = inst_code_lower4 & 0x07;
 		break;
 
 	case 0xf0:
 		/* CMP */
 		Decode_Return = CMP;
+		A_Instruction = inst_code_lower4 & 0x08;
+		B_Instruction = inst_code_lower4 & 0x07;
 		break;
 
 	default:
 		/* エラー処理 */
-		fprintf(stderr, "error inst\n");
+		fprintf(stderr, "Error: Instruction code\n");
 		Decode_Return = RUN_HALT;
 		break;
 	}
 	return Decode_Return;
+}
+
+Uword Set_A_Value(char *Instruction_name, Cpub *cpub){
+	Uword Withdraw_value;
+	if(strcmp(Instruction_name,"ST") == 0 && A_Instruction == 1){
+		fprintf(stderr, "Warning: ST isn't allowed setting 'Instruction_A = 0'");
+		A_Instruction = 0;
+	}
+	if(A_Instruction == 1){
+		Withdraw_value = cpub->ix;
+	}else{
+		Withdraw_value = cpub->acc;
+	}
+	return Withdraw_value;
 }

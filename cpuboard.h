@@ -49,4 +49,38 @@ typedef struct cpuboard {
 #define	RUN_STEP	1
 int	step(Cpub *);
 
+/*=============================================================================
+ *   命令語コード定義(1語目:16bit)
+ *===========================================================================*/
+#define NOP 0x00
+#define HLT 0x0f
+#define OUT 0x10
+#define IN 	0x1f
+#define RCF 0x20
+#define SCF 0x2f
+#define LD	0x60
+#define ST	0x70
+#define ADD	0xb0
+#define ADC	0x90
+#define SUB	0xa0
+#define SBC	0x80
+#define CMP	0xf0
+#define AND	0xe0
+#define OR	0xd0
+#define EOR	0xc0
+#define Ssm	0x40
+#define Rsm	0x40+0x04
+#define Bbc	0x30
+#define JAL	0x0a
+#define JR	0x0b
 
+/*=============================================================================
+ *   命令コード1語目のB(3bit)
+ *===========================================================================*/
+#define ACC 0x00			/* アキュムレータ */
+#define IX 0x01				/* インデックスレジスタ */
+#define Immediate_d 0x02	/* 即値アドレス */
+#define Program_Absolute_d 0x04		/* 絶対アドレス(プログラム領域) */
+#define Data_Absolute_d 0x05		/* 絶対アドレス(データ領域) */
+#define Program_IX 0x06			/* IX修飾アドレス(プログラム領域) */
+#define Data_IX 0x07		/* IX修飾アドレス(データ領域) */
