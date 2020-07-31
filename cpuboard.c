@@ -16,6 +16,8 @@ Uword sm;				/* Shift mode */
 Uword bc;				/* Branch Condition */
 
 int ST_Instruction(Cpub *);
+int AND_Instruction(Cpub *);
+int OR_Instruction(Cpub *);
 int EOR_Instruction(Cpub *);
 Uword instruction_decoding(Uword ir);
 Uword Set_A_Value(char *Instruction_name, Cpub *);						/* A値のセット */
@@ -118,9 +120,13 @@ int step(Cpub *cpub)
 			break;
 		case OR:
 			fprintf(stderr, "execute OR\n");
+			RUN_Return = OR_Instruction(cpub);
+			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: OR Instruction\n");
 			break;
 		case AND:
 			fprintf(stderr, "execute AND\n");
+			RUN_Return = AND_Instruction(cpub);
+			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: AND Instruction\n");
 			break;
 		case CMP:
 			fprintf(stderr, "execute CMP\n");
@@ -175,13 +181,115 @@ int ST_Instruction(Cpub *cpub){
 	return RUN_STEP;
 }
 
+/* AND命令 */
+int AND_Instruction(Cpub *cpub){
+	Uword Second_word;
+	Uword A_Value = Set_A_Value("AND", cpub);
+	Uword ALU_result;
+
+	/* P2 Phase */
+	if(!(B_Instruction == ACC) && !(B_Instruction == IX)){
+		cpub->mar = cpub->pc;
+		cpub->pc++;
+		Second_word = cpub->mem[0x000 + cpub->mar];
+	}
+
+	/* P2~P4 Phase */
+	switch(B_Instruction)
+	{
+		case ACC:
+			ALU_result = A_Value & cpub->acc;
+			break;
+		case IX:
+			ALU_result = A_Value & cpub->ix;
+			break;
+		case Immediate_d:
+			ALU_result = A_Value & Second_word;
+			break;
+		case Program_Absolute_d:
+			cpub->mar = Second_word;
+			ALU_result = A_Value & cpub->mem[0x000+cpub->mar];
+			break;
+		case Data_Absolute_d:
+			cpub->mar = Second_word;
+			ALU_result = A_Value & cpub->mem[0x100+cpub->mar];
+			break;
+		case Program_IX:
+			cpub->mar = Second_word + cpub->ix;
+			ALU_result = A_Value & cpub->mem[0x000+cpub->mar];
+			break;
+		case Data_IX:
+			cpub->mar = Second_word + cpub->ix;
+			ALU_result = A_Value & cpub->mem[0x100+cpub->mar];
+			break;
+		default:
+			fprintf(stderr,"Error: OP_B was not defined in AND Instruction\n");
+			return RUN_HALT;
+			break;
+	}
+	Write_A_Value(cpub, ALU_result);
+	Set_Flags(cpub, cpub->cf, 0, ALU_result);
+	return RUN_STEP;
+}
+
+/* OR命令 */
+int OR_Instruction(Cpub *cpub){
+	Uword Second_word;
+	Uword A_Value = Set_A_Value("OR", cpub);
+	Uword ALU_result;
+
+	/* P2 Phase */
+	if(!(B_Instruction == ACC) && !(B_Instruction == IX)){
+		cpub->mar = cpub->pc;
+		cpub->pc++;
+		Second_word = cpub->mem[0x000 + cpub->mar];
+	}
+
+	/* P2~P4 Phase */
+	switch(B_Instruction)
+	{
+		case ACC:
+			ALU_result = A_Value | cpub->acc;
+			break;
+		case IX:
+			ALU_result = A_Value | cpub->ix;
+			break;
+		case Immediate_d:
+			ALU_result = A_Value | Second_word;
+			break;
+		case Program_Absolute_d:
+			cpub->mar = Second_word;
+			ALU_result = A_Value | cpub->mem[0x000+cpub->mar];
+			break;
+		case Data_Absolute_d:
+			cpub->mar = Second_word;
+			ALU_result = A_Value | cpub->mem[0x100+cpub->mar];
+			break;
+		case Program_IX:
+			cpub->mar = Second_word + cpub->ix;
+			ALU_result = A_Value | cpub->mem[0x000+cpub->mar];
+			break;
+		case Data_IX:
+			cpub->mar = Second_word + cpub->ix;
+			ALU_result = A_Value | cpub->mem[0x100+cpub->mar];
+			break;
+		default:
+			fprintf(stderr,"Error: OP_B was not defined in OR Instruction\n");
+			return RUN_HALT;
+			break;
+	}
+	Write_A_Value(cpub, ALU_result);
+	Set_Flags(cpub, cpub->cf, 0, ALU_result);
+	return RUN_STEP;
+}
+
 /* EOR命令 */
 int EOR_Instruction(Cpub *cpub){
 	Uword Second_word;
 	Uword A_Value = Set_A_Value("EOR", cpub);
-	Uword ALU_result;		
-	/* P2 Phase */
+	Uword ALU_result;
 
+	/* P2 Phase */
 	if(!(B_Instruction == ACC) && !(B_Instruction == IX)){
 		cpub->mar = cpub->pc;
 		cpub->pc++;
