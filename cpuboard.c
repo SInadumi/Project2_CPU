@@ -16,8 +16,11 @@ Uword sm;				/* Shift mode */
 Uword bc;				/* Branch Condition */
 
 int ST_Instruction(Cpub *);
+int EOR_Instruction(Cpub *);
 Uword instruction_decoding(Uword ir);
-Uword Set_A_Value(char *Instruction_name, Cpub *);
+Uword Set_A_Value(char *Instruction_name, Cpub *);						/* A値のセット */
+void Write_A_Value(Cpub *cpub, Uword ALU_result);						/* ACC or IX に処理結果を書き込む */
+void Set_Flags(Cpub *cpub, Bit Carry, Bit Over, Uword ALU_result);		/* CF,VF,NF,ZF のセット */
 
 /*=============================================================================
  *   Simulation of a Single Instruction
@@ -100,6 +103,8 @@ int step(Cpub *cpub)
 			break;
 		case EOR:
 			fprintf(stderr, "execute EOR\n");
+			RUN_Return = EOR_Instruction(cpub);
+			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: EOR Instruction\n");
 			break;
 		case OR:
 			fprintf(stderr, "execute OR\n");
@@ -112,7 +117,7 @@ int step(Cpub *cpub)
 			break;
 		default:
 			/* エラー処理 */
-			fprintf(stderr, "error\n");
+			fprintf(stderr, "Error\n");
 			RUN_Return = RUN_HALT;
 			break;
 	}
@@ -129,30 +134,26 @@ int ST_Instruction(Cpub *cpub){
 	cpub->pc++;
 	Second_word = cpub->mem[0x000 + cpub->mar];
 
-	/* P3 Phase */
+	/* P3,P4 Phase */
 	switch (B_Instruction)
 	{
 	case Program_Absolute_d :
 		cpub->mar = Second_word;
-		/* P4 Phase */
 		cpub->mem[0x000 + cpub->mar] = A_Value;
 		break;
 
 	case Data_Absolute_d :
 		cpub->mar = Second_word;
-		/* P4 Phase */
 		cpub->mem[0x100 + cpub->mar] = A_Value;
 		break;
 
 	case Program_IX :
 		cpub->mar = Second_word + cpub->ix;
-		/* P4 Phase */
 		cpub->mem[0x000 + cpub->mar] = A_Value;
 		break;
 
 	case Data_IX :
 		cpub->mar = Second_word + cpub->ix;
-		/* P4 Phase */
 		cpub->mem[0x100 + cpub->mar] = A_Value;
 		break;
 
@@ -161,6 +162,55 @@ int ST_Instruction(Cpub *cpub){
 		return RUN_HALT;
 		break;
 	}
+	return RUN_STEP;
+}
+/* EOR命令 */
+int EOR_Instruction(Cpub *cpub){
+	Uword Second_word;
+	Uword A_Value = Set_A_Value("EOR", cpub);
+	Uword ALU_result;		
+	/* P2 Phase */
+	if(B_Instruction != ACC || B_Instruction != IX){
+		cpub->mar = cpub->pc;
+		cpub->pc++;
+		Second_word = cpub->mem[0x000 + cpub->mar];
+	}
+
+	/* P2~P4 Phase */
+	switch(B_Instruction)
+	{
+		case ACC:
+			ALU_result = A_Value ^ cpub->acc;
+			break;
+		case IX:
+			ALU_result = A_Value ^ cpub->ix;
+			break;
+		case Immediate_d:
+			ALU_result = A_Value ^ Second_word;
+			break;
+		case Program_Absolute_d:
+			cpub->mar = Second_word;
+			ALU_result = A_Value ^ cpub->mem[0x000+cpub->mar];
+			break;
+		case Data_Absolute_d:
+			cpub->mar = Second_word;
+			ALU_result = A_Value ^ cpub->mem[0x100+cpub->mar];
+			break;
+		case Program_IX:
+			cpub->mar = Second_word + cpub->ix;
+			ALU_result = A_Value ^ cpub->mem[0x000+cpub->mar];
+			break;
+		case Data_IX:
+			cpub->mar = Second_word + cpub->ix;
+			ALU_result = A_Value ^ cpub->mem[0x100+cpub->mar];
+			break;
+		default:
+			fprintf(stderr,"Error: OP_B was not defined in EOR Instruction\n");
+			return RUN_HALT;
+			break;
+	}
+	Write_A_Value(cpub, ALU_result);
+	Set_Flags(cpub, cpub->cf, 0, ALU_result);
 	return RUN_STEP;
 }
 
@@ -304,10 +354,30 @@ Uword Set_A_Value(char *Instruction_name, Cpub *cpub){
 		fprintf(stderr, "Warning: ST isn't allowed setting 'Instruction_A = 0'");
 		A_Instruction = 0;
 	}
-	if(A_Instruction == 1){
-		Withdraw_value = cpub->ix;
-	}else{
+	if(A_Instruction == 0){
 		Withdraw_value = cpub->acc;
+	}else{
+		Withdraw_value = cpub->ix;
 	}
 	return Withdraw_value;
+}
+
+void Write_A_Value(Cpub *cpub, Uword ALU_result){
+	if(A_Instruction == 0){
+		cpub->acc = ALU_result;
+	}else{
+		cpub->ix = ALU_result;
+	}
+}
+
+void Set_Flags(Cpub *cpub, Bit Carry, Bit Over, Uword ALU_result){
+	Bit Negative_Flag = ALU_result & 0x64;
+	Bit Zero_Flag;
+	if(ALU_result == 0) Zero_Flag = 1;
+	else Zero_Flag =0;
+
+	cpub->cf = Carry;
+	cpub->vf = Over;
+	cpub->nf = Negative_Flag;
+	cpub->zf = Zero_Flag;
 }
