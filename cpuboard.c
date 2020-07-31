@@ -16,7 +16,6 @@ Uword sm;				/* Shift mode */
 Uword bc;				/* Branch Condition */
 
 int ST_Instruction(Cpub *);
-int ADD_Instruction(Cpub *);
 int EOR_Instruction(Cpub *);
 Uword instruction_decoding(Uword ir);
 Uword Set_A_Value(char *Instruction_name, Cpub *);						/* A値のセット */
@@ -175,17 +174,15 @@ int ST_Instruction(Cpub *cpub){
 	}
 	return RUN_STEP;
 }
-/* ADD命令 */
-/*int ADD_Instruction(Cpub *cpub){
 
-}*/
 /* EOR命令 */
 int EOR_Instruction(Cpub *cpub){
 	Uword Second_word;
 	Uword A_Value = Set_A_Value("EOR", cpub);
 	Uword ALU_result;		
 	/* P2 Phase */
-	if(B_Instruction != ACC || B_Instruction != IX){
+
+	if(!(B_Instruction == ACC) && !(B_Instruction == IX)){
 		cpub->mar = cpub->pc;
 		cpub->pc++;
 		Second_word = cpub->mem[0x000 + cpub->mar];
@@ -237,7 +234,6 @@ Uword instruction_decoding(Uword ir){
 	/* 上位4bitの取り出し */
 	Uword mask_upper4 = 0xf0;
 	Uword inst_code_upper4 = ir & mask_upper4;
-
 	/* 下位4bitの取り出し */
 	Uword mask_lower4 = 0x0f;
 	Uword inst_code_lower4 = ir & mask_lower4;
@@ -295,7 +291,6 @@ Uword instruction_decoding(Uword ir){
 		Decode_Return = ST;
 		A_Instruction = inst_code_lower4 & 0x08;
 		B_Instruction = inst_code_lower4 & 0x07;
-		//fprintf(stderr,"A:%x, B:%x\n",A_Instruction,B_Instruction);
 		break;
 
 	case 0x80:
