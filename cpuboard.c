@@ -16,6 +16,7 @@ Uword sm;				/* Shift mode */
 Uword bc;				/* Branch Condition */
 
 int ST_Instruction(Cpub *);
+int ADD_Instruction(Cpub *);
 int EOR_Instruction(Cpub *);
 Uword instruction_decoding(Uword ir);
 Uword Set_A_Value(char *Instruction_name, Cpub *);						/* A値のセット */
@@ -62,15 +63,25 @@ int step(Cpub *cpub)
 			break;
 		case OUT:
 			fprintf(stderr, "execute OUT\n");
+			cpub->obuf.buf = cpub->acc;
+			cpub->obuf.flag = 1;
+			RUN_Return = RUN_STEP;
 			break;
 		case IN:
 			fprintf(stderr, "execute IN\n");
+			cpub->acc = cpub->ibuf->buf;
+			cpub->ibuf->flag = 0;
+			RUN_Return = RUN_STEP;
 			break;
 		case RCF:
 			fprintf(stderr, "execute RCF\n");
+			cpub->cf = 0;
+			RUN_Return = RUN_STEP;
 			break;
 		case SCF:
 			fprintf(stderr, "execute SCF\n");
+			cpub->cf = 1;
+			RUN_Return = RUN_STEP;
 			break;
 		case Bbc:
 			fprintf(stderr, "execute Bbc\n");
@@ -164,6 +175,10 @@ int ST_Instruction(Cpub *cpub){
 	}
 	return RUN_STEP;
 }
+/* ADD命令 */
+/*int ADD_Instruction(Cpub *cpub){
+
+}*/
 /* EOR命令 */
 int EOR_Instruction(Cpub *cpub){
 	Uword Second_word;
@@ -238,21 +253,21 @@ Uword instruction_decoding(Uword ir){
 		
 		// 下位4bit目を取り出す
 		if((ir & 0x08) == 0) Decode_Return = NOP;
-		else if((ir & 0x08) == 1) Decode_Return = HLT;
+		else if((ir & 0x08) == 8) Decode_Return = HLT;
 		break;
 
 	case 0x10:
 		/* OUT,IN */
 		// 下位4bit目を取り出す
 		if((inst_code_lower4 & 0x08) == 0) Decode_Return = OUT;
-		else if((inst_code_lower4 & 0x08) == 1) Decode_Return = IN;
+		else if((inst_code_lower4 & 0x08) == 8) Decode_Return = IN;
 		break;
 
 	case 0x20:
 		/* RCF,SCF */
 		// 下位4bit目を取り出す
 		if((inst_code_lower4 & 0x08) == 0) Decode_Return = RCF;
-		else if((inst_code_lower4 & 0x08) == 1) Decode_Return = SCF;
+		else if((inst_code_lower4 & 0x08) == 8) Decode_Return = SCF;
 		break;
 
 	case 0x30:
@@ -265,7 +280,7 @@ Uword instruction_decoding(Uword ir){
 		// /* Ssm,Rsm */
 		// //下位3bit目を取り出す
 		// if((inst_code_lower4 & 0x04) == 0) Decode_Return = Ssm;
-		// else if((inst_code_lower4 & 0x04) == 1) Decode_Return = Rsm;
+		// else if((inst_code_lower4 & 0x04) == 4) Decode_Return = Rsm;
 		// break;
 
 	case 0x60:
