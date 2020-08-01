@@ -84,3 +84,23 @@ int	step(Cpub *);
 #define Data_Absolute_d 0x05		/* 絶対アドレス(データ領域) */
 #define Program_IX 0x06			/* IX修飾アドレス(プログラム領域) */
 #define Data_IX 0x07		/* IX修飾アドレス(データ領域) */
+
+/*=============================================================================
+ *   Branch Condition(4bit)
+ *===========================================================================*/
+#define BC_A  0x00
+#define BC_VF 0x08
+#define BC_NZ 0x01
+#define BC_Z  0x09
+#define BC_ZP 0x02
+#define BC_N  0x0a
+#define BC_P  0x03
+#define BC_ZN 0x0b
+#define BC_NI 0x04
+#define BC_NO 0x0c
+#define BC_NC 0x05
+#define BC_C  0x0d
+#define BC_CE 0x06
+#define BC_LT 0x0e
+#define BC_GT 0x07
+#define BC_LE 0x0f

@@ -12,8 +12,8 @@
 /* 各種変数・関数の定義 */
 Uword A_Instruction;	/* 1語目Aの命令 */
 Uword B_Instruction;	/* 1語目Bの命令 */
-Uword sm;				/* Shift mode */
-Uword bc;				/* Branch Condition */
+Uword ShiftMode;		/* Shift mode */
+Uword BranchCondition;	/* Branch Condition */
 
 int ST_Instruction(Cpub *);												/* ST命令 */
 int ADD_Instruction(Cpub *);											/* ADD命令 */
@@ -21,6 +21,7 @@ int SUB_Instruction(Cpub *);											/* SUB命令 */
 int AND_Instruction(Cpub *);											/* AND命令 */
 int OR_Instruction(Cpub *);												/* OR命令 */
 int EOR_Instruction(Cpub *);											/* EOR命令 */
+int Bbc_Instruction(Cpub *);											/* 分岐命令 */
 Uword instruction_decoding(Uword ir);									/* 命令解読機構 */
 Uword Set_A_Value(char *Instruction_name, Cpub *);						/* A値のセット */
 void Write_A_Value(Cpub *cpub, Uword ALU_result);						/* ACC or IX に処理結果を書き込む */
@@ -88,6 +89,8 @@ int step(Cpub *cpub)
 			break;
 		case Bbc:
 			fprintf(stderr, "execute Bbc\n");
+			RUN_Return = Bbc_Instruction(cpub);
+			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: Branch Instruction\n");
 			break;
 		// case Ssm:
 		// 	fprintf(stderr, "execute Ssm\n");
@@ -179,7 +182,7 @@ int ST_Instruction(Cpub *cpub){
 		break;
 
 	default:
-		fprintf(stderr,"Error: OP_B was not defined in ST Instruction\n");
+		fprintf(stderr,"Error: OP_B(%x) was not defined in ST Instruction\n",B_Instruction);
 		return RUN_HALT;
 		break;
 	}
@@ -249,7 +252,7 @@ int ADD_Instruction(Cpub *cpub){
 			C = ALU_result >> 7;
 			break;
 		default:
-			fprintf(stderr,"Error: OP_B was not defined in ADD Instruction\n");
+			fprintf(stderr,"Error: OP_B(%x) was not defined in ADD Instruction\n",B_Instruction);
 			return RUN_HALT;
 			break;
 	}
@@ -323,7 +326,7 @@ int SUB_Instruction(Cpub *cpub){
 			C = ALU_result >> 7;
 			break;
 		default:
-			fprintf(stderr,"Error: OP_B was not defined in SUB Instruction\n");
+			fprintf(stderr,"Error: OP_B(%x) was not defined in SUB Instruction\n",B_Instruction);
 			return RUN_HALT;
 			break;
 	}
@@ -375,7 +378,7 @@ int AND_Instruction(Cpub *cpub){
 			ALU_result = A_Value & cpub->mem[0x100+cpub->mar];
 			break;
 		default:
-			fprintf(stderr,"Error: OP_B was not defined in AND Instruction\n");
+			fprintf(stderr,"Error: OP_B(%x) was not defined in AND Instruction\n",B_Instruction);
 			return RUN_HALT;
 			break;
 	}
@@ -425,7 +428,7 @@ int OR_Instruction(Cpub *cpub){
 			ALU_result = A_Value | cpub->mem[0x100+cpub->mar];
 			break;
 		default:
-			fprintf(stderr,"Error: OP_B was not defined in OR Instruction\n");
+			fprintf(stderr,"Error: OP_B(%x) was not defined in OR Instruction\n",B_Instruction);
 			return RUN_HALT;
 			break;
 	}
@@ -475,12 +478,79 @@ int EOR_Instruction(Cpub *cpub){
 			ALU_result = A_Value ^ cpub->mem[0x100+cpub->mar];
 			break;
 		default:
-			fprintf(stderr,"Error: OP_B was not defined in EOR Instruction\n");
+			fprintf(stderr,"Error: OP_B(%x) was not defined in EOR Instruction\n",B_Instruction);
 			return RUN_HALT;
 			break;
 	}
 	Write_A_Value(cpub, ALU_result);
 	Set_Flags(cpub, cpub->cf, 0, ALU_result);
+	return RUN_STEP;
+}
+
+int Bbc_Instruction(Cpub *cpub){
+	Uword Second_word;
+	
+	/* P2 Phase */
+	cpub->mar = cpub->pc;
+	cpub->pc++;
+	Second_word = cpub->mem[0x000 + cpub->mar];
+	
+	/* P3 Phase */
+	switch(BranchCondition)
+	{
+		case BC_A:
+			cpub->pc = Second_word;
+			break;
+		case BC_VF:
+			if(cpub->vf) cpub->pc = Second_word;
+			break;
+		case BC_NZ:
+			if(!(cpub->zf)) cpub->pc = Second_word;
+			break;
+		case BC_Z:
+			if(cpub->zf) cpub->pc = Second_word;
+			break;
+		case BC_ZP:
+			if(!(cpub->nf)) cpub->pc = Second_word;
+			break;
+		case BC_N:
+			if(cpub->nf) cpub->pc = Second_word;
+			break;
+		case BC_P:
+			if(!(cpub->nf & cpub->zf)) cpub->pc = Second_word;
+			break;
+		case BC_ZN:
+			if(cpub->nf & cpub->zf) cpub->pc = Second_word;
+			break;
+		case BC_NI:
+			if(!(cpub->ibuf->flag)) cpub->pc = Second_word;
+			break;
+		case BC_NO:
+			if(cpub->obuf.flag) cpub->pc = Second_word;
+			break;
+		case BC_NC:
+			if(!(cpub->cf)) cpub->pc = Second_word;
+			break;
+		case BC_C:
+			if(cpub->cf) cpub->pc = Second_word;
+			break;
+		case BC_CE:
+			if(!(cpub->vf ^ cpub->nf)) cpub->pc = Second_word;
+			break;
+		case BC_LT:
+			if(cpub->vf ^ cpub->nf) cpub->pc = Second_word;
+			break;
+		case BC_GT:
+			if(!((cpub->vf ^ cpub->nf) | cpub->zf)) cpub->pc = Second_word;
+			break;
+		case BC_LE:
+			if((cpub->vf ^ cpub->nf) | cpub->zf) cpub->pc = Second_word;
+			break;
+		default:
+			fprintf(stderr,"Error: Branch_Condition(%x) was not defined in Branch Instruction\n", BranchCondition);
+			return RUN_HALT;
+			break;
+	}
 	return RUN_STEP;
 }
 
@@ -527,7 +597,7 @@ Uword instruction_decoding(Uword ir){
 	case 0x30:
 		/* Bbc */
 		Decode_Return = Bbc;
-		bc = inst_code_lower4 & 0x15;
+		BranchCondition = inst_code_lower4 & 0x15;
 		break;
 
 	case 0x40:
