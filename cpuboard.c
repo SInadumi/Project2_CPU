@@ -15,11 +15,12 @@ Uword B_Instruction;	/* 1語目Bの命令 */
 Uword sm;				/* Shift mode */
 Uword bc;				/* Branch Condition */
 
-int ST_Instruction(Cpub *);
-int AND_Instruction(Cpub *);
-int OR_Instruction(Cpub *);
-int EOR_Instruction(Cpub *);
-Uword instruction_decoding(Uword ir);
+int ST_Instruction(Cpub *);												/* ST命令 */
+int ADD_Instruction(Cpub *);											/* ADD命令 */
+int AND_Instruction(Cpub *);											/* AND命令 */
+int OR_Instruction(Cpub *);												/* OR命令 */
+int EOR_Instruction(Cpub *);											/* EOR命令 */
+Uword instruction_decoding(Uword ir);									/* 命令解読機構 */
 Uword Set_A_Value(char *Instruction_name, Cpub *);						/* A値のセット */
 void Write_A_Value(Cpub *cpub, Uword ALU_result);						/* ACC or IX に処理結果を書き込む */
 void Set_Flags(Cpub *cpub, Bit Carry, Bit Over, Uword ALU_result);		/* CF,VF,NF,ZF のセット */
@@ -112,6 +113,8 @@ int step(Cpub *cpub)
 			break;
 		case ADD:
 			fprintf(stderr, "execute ADD\n");
+			RUN_Return = ADD_Instruction(cpub);
+			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: ADD Instruction\n");
 			break;
 		case EOR:
 			fprintf(stderr, "execute EOR\n");
@@ -140,7 +143,6 @@ int step(Cpub *cpub)
 	return RUN_Return;
 }
 
-/* ST命令 */
 int ST_Instruction(Cpub *cpub){	
 	Uword Second_word;
 	Uword A_Value = Set_A_Value("ST", cpub);		/* 1 -> IX, 0 -> ACC */
@@ -181,7 +183,80 @@ int ST_Instruction(Cpub *cpub){
 	return RUN_STEP;
 }
 
-/* AND命令 */
+int ADD_Instruction(Cpub *cpub){
+	Uword Second_word;
+	Uword A_Value = Set_A_Value("ADD", cpub);
+	Uword ALU_result;
+	Bit OF;			/* Over Flow Flag */
+	Bit A,B,C;		/* A:第1OPのMSB B:第2OPのMSB C:ALU_resultのMSB */
+
+	/* P2 Phase */
+	if(!(B_Instruction == ACC) && !(B_Instruction == IX)){
+		cpub->mar = cpub->pc;
+		cpub->pc++;
+		Second_word = cpub->mem[0x000 + cpub->mar];
+	}
+	/* P2~P4 Phase */
+	switch(B_Instruction)
+	{
+		case ACC:
+			ALU_result = A_Value + cpub->acc;
+			A = A_Value >> 7;
+			B = cpub->acc >> 7;
+			C = ALU_result >> 7;
+			break;
+		case IX:
+			ALU_result = A_Value + cpub->ix;
+			A = A_Value >> 7;
+			B = cpub->ix >> 7;
+			C = ALU_result >> 7;
+			break;
+		case Immediate_d:
+			ALU_result = A_Value + Second_word;
+			A = A_Value >> 7;
+			B = Second_word >> 7;
+			C = ALU_result >> 7;
+			break;
+		case Program_Absolute_d:
+			cpub->mar = Second_word;
+			ALU_result = A_Value + cpub->mem[0x000+cpub->mar];
+			A = A_Value >> 7;
+			B = cpub->mem[0x000+cpub->mar] >> 7;
+			C = ALU_result >> 7;
+			break;
+		case Data_Absolute_d:
+			cpub->mar = Second_word;
+			ALU_result = A_Value + cpub->mem[0x100+cpub->mar];
+			A = A_Value >> 7;
+			B = cpub->mem[0x100+cpub->mar] >> 7;
+			C = ALU_result >> 7;
+			break;
+		case Program_IX:
+			cpub->mar = Second_word + cpub->ix;
+			ALU_result = A_Value + cpub->mem[0x000+cpub->mar];
+			A = A_Value >> 7;
+			B = cpub->mem[0x000+cpub->mar] >> 7;
+			C = ALU_result >> 7;
+			break;
+		case Data_IX:
+			cpub->mar = Second_word + cpub->ix;
+			ALU_result = A_Value + cpub->mem[0x100+cpub->mar];
+			A = A_Value >> 7;
+			B = cpub->mem[0x100+cpub->mar] >> 7;
+			C = ALU_result >> 7;
+			break;
+		default:
+			fprintf(stderr,"Error: OP_B was not defined in ADD Instruction\n");
+			return RUN_HALT;
+			break;
+	}
+
+	OF = (A & B & (~C)) | ((~A) & (~B) & C);
+	Write_A_Value(cpub, ALU_result);
+	Set_Flags(cpub, cpub->cf, OF, ALU_result);
+	return RUN_STEP;
+}
+
 int AND_Instruction(Cpub *cpub){
 	Uword Second_word;
 	Uword A_Value = Set_A_Value("AND", cpub);
@@ -232,7 +307,6 @@ int AND_Instruction(Cpub *cpub){
 	return RUN_STEP;
 }
 
-/* OR命令 */
 int OR_Instruction(Cpub *cpub){
 	Uword Second_word;
 	Uword A_Value = Set_A_Value("OR", cpub);
@@ -283,7 +357,6 @@ int OR_Instruction(Cpub *cpub){
 	return RUN_STEP;
 }
 
-/* EOR命令 */
 int EOR_Instruction(Cpub *cpub){
 	Uword Second_word;
 	Uword A_Value = Set_A_Value("EOR", cpub);
@@ -491,11 +564,11 @@ void Write_A_Value(Cpub *cpub, Uword ALU_result){
 void Set_Flags(Cpub *cpub, Bit Carry, Bit Over, Uword ALU_result){
 	Bit Negative_Flag = ALU_result & 0x64;
 	Bit Zero_Flag;
-	if(ALU_result == 0) Zero_Flag = 1;
-	else Zero_Flag =0;
+	if(ALU_result == 0) Zero_Flag = 0x01;
+	else Zero_Flag =0x00;
 
 	cpub->cf = Carry;
 	cpub->vf = Over;
-	cpub->nf = Negative_Flag;
+	cpub->nf = Negative_Flag >> 6;
 	cpub->zf = Zero_Flag;
 }
