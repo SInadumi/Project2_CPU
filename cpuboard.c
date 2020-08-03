@@ -15,6 +15,7 @@ Uword B_Instruction;	/* 1語目Bの命令 */
 Uword ShiftMode;		/* Shift mode */
 Uword BranchCondition;	/* Branch Condition */
 
+int LD_Instruction(Cpub *);												/* LD命令 */
 int ST_Instruction(Cpub *);												/* ST命令 */
 int ADD_Instruction(Cpub *);											/* ADD命令 */
 int ADC_Instruction(Cpub *);											/* ADC命令 */
@@ -103,6 +104,8 @@ int step(Cpub *cpub)
 		// 	break;
 		case LD:
 			fprintf(stderr, "execute LD\n");
+			RUN_Return = LD_Instruction(cpub);
+			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: LD Instruction\n");
 			break;
 		case ST:
 			fprintf(stderr, "execute ST\n");
@@ -156,6 +159,54 @@ int step(Cpub *cpub)
 			break;
 	}
 	return RUN_Return;
+}
+
+int LD_Instruction(Cpub *cpub){
+	Uword Second_word;
+	Uword ALU_result;
+
+	/* P2 Phase */
+	if(!(B_Instruction == ACC) && !(B_Instruction == IX)){
+		cpub->mar = cpub->pc;
+		cpub->pc++;
+		Second_word = cpub->mem[0x000 + cpub->mar];
+	}
+
+	/* P2~P4 Phase */
+	switch(B_Instruction)
+	{
+		case ACC:
+			ALU_result = cpub->acc;
+			break;
+		case IX:
+			ALU_result = cpub->ix;
+			break;
+		case Immediate_d:
+			ALU_result = Second_word;
+			break;
+		case Program_Absolute_d:
+			cpub->mar = Second_word;
+			ALU_result = cpub->mem[0x000+cpub->mar];
+			break;
+		case Data_Absolute_d:
+			cpub->mar = Second_word;
+			ALU_result = cpub->mem[0x100+cpub->mar];
+			break;
+		case Program_IX:
+			cpub->mar = Second_word + cpub->ix;
+			ALU_result = cpub->mem[0x000+cpub->mar];
+			break;
+		case Data_IX:
+			cpub->mar = Second_word + cpub->ix;
+			ALU_result = cpub->mem[0x100+cpub->mar];
+			break;
+		default:
+			fprintf(stderr,"Error: OP_B(%x) was not defined in LD Instruction\n",B_Instruction);
+			return RUN_HALT;
+			break;
+	}
+	Write_A_Value(cpub, ALU_result);
+	return RUN_STEP;
 }
 
 int ST_Instruction(Cpub *cpub){	
