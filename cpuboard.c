@@ -14,6 +14,7 @@ Uword A_Instruction;	/* 1語目Aの命令 */
 Uword B_Instruction;	/* 1語目Bの命令 */
 Uword ShiftMode;		/* Shift mode */
 Uword BranchCondition;	/* Branch Condition */
+Bit JAL_is_running = 0;	/* サブルーチン命令が実行中であるか */
 
 int LD_Instruction(Cpub *);												/* LD命令 */
 int ST_Instruction(Cpub *);												/* ST命令 */
@@ -26,8 +27,9 @@ int OR_Instruction(Cpub *);												/* OR命令 */
 int EOR_Instruction(Cpub *);											/* EOR命令 */
 int CMP_Instruction(Cpub *);											/* CMP命令 */
 int Shift_Instruction(Cpub *);											/* Shift命令 */
-int Rotate_Instruction(Cpub *);
+int Rotate_Instruction(Cpub *);											/* Rotation命令 */
 int Branch_Instruction(Cpub *);											/* 分岐命令 */
+int JAL_Instruction(Cpub *);											/* JAL命令 */
 Uword instruction_decoding(Uword ir);									/* 命令解読機構 */
 Uword Set_A_Value(char *Instruction_name, Cpub *);						/* A値のセット */
 void Write_A_Value(Cpub *cpub, Uword ALU_result);						/* ACC or IX に処理結果を書き込む */
@@ -67,9 +69,19 @@ int step(Cpub *cpub)
 			break;
 		case JAL:
 			fprintf(stderr, "execute JAL\n");
+			RUN_Return = JAL_Instruction(cpub);
+			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: JAL Instruction\n");
 			break;
 		case JR:
 			fprintf(stderr, "execute JR\n");
+			// JALが実行するサブルーチン中に呼び出されたか
+			if(JAL_is_running == 1){
+				cpub->pc = cpub->acc;
+				RUN_Return = RUN_STEP;
+			}else{
+				fprintf(stderr, "Error: JR Instruction is denied. Because JAL Instruction is not running.\n");
+				RUN_Return = RUN_HALT;
+			}
 			break;
 		case OUT:
 			fprintf(stderr, "execute OUT\n");
@@ -951,6 +963,25 @@ int Branch_Instruction(Cpub *cpub){
 	return RUN_STEP;
 }
 
+int JAL_Instruction(Cpub *cpub){
+	Uword Second_word;
+
+	/* P2 Phase */
+	cpub->mar = cpub->pc;
+	cpub->pc++;
+	Second_word = cpub->mem[0x000 + cpub->mar];
+
+	/* P3 Phase */
+	// サブルーチン実行後に戻る位置をaccに保存
+	cpub->acc = cpub->pc;
+
+	/* P4 Phase */
+	// サブルーチン実行位置をpcに指定
+	cpub->pc = Second_word;
+	JAL_is_running = 1;
+	return RUN_STEP;
+}
+
 /* 命令解読を行う関数 */
 Uword instruction_decoding(Uword ir){
 
@@ -966,15 +997,11 @@ Uword instruction_decoding(Uword ir){
 	switch (inst_code_upper4)
 	{
 	case 0x00:
-		/* NOP,HLT,JAL,JR */
-		if(ir == JAL){
-			Decode_Return = JAL;
-		}
-		else if(ir == JR) Decode_Return = JR;
-		
-		// 下位4bit目を取り出す
-		if((ir & 0x08) == 0) Decode_Return = NOP;
-		else if((ir & 0x08) == 8) Decode_Return = HLT;
+		/* NOP,HLT,JAL,JR */// 下位4bit目を取り出す
+		if(ir == 0x0a) Decode_Return = JAL;
+		else if(ir == 0x0b) Decode_Return = JR;
+		else if((ir & 0x08) == 0x00) Decode_Return = NOP;
+		else if((ir & 0x08) == 0x08) Decode_Return = HLT;
 		break;
 
 	case 0x10:
