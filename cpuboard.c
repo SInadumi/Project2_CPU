@@ -25,7 +25,9 @@ int AND_Instruction(Cpub *);											/* AND命令 */
 int OR_Instruction(Cpub *);												/* OR命令 */
 int EOR_Instruction(Cpub *);											/* EOR命令 */
 int CMP_Instruction(Cpub *);											/* CMP命令 */
-int Bbc_Instruction(Cpub *);											/* 分岐命令 */
+int Shift_Instruction(Cpub *);											/* Shift命令 */
+int Rotate_Instruction(Cpub *);
+int Branch_Instruction(Cpub *);											/* 分岐命令 */
 Uword instruction_decoding(Uword ir);									/* 命令解読機構 */
 Uword Set_A_Value(char *Instruction_name, Cpub *);						/* A値のセット */
 void Write_A_Value(Cpub *cpub, Uword ALU_result);						/* ACC or IX に処理結果を書き込む */
@@ -93,15 +95,19 @@ int step(Cpub *cpub)
 			break;
 		case Bbc:
 			fprintf(stderr, "execute Bbc\n");
-			RUN_Return = Bbc_Instruction(cpub);
+			RUN_Return = Branch_Instruction(cpub);
 			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: Branch Instruction\n");
 			break;
-		// case Ssm:
-		// 	fprintf(stderr, "execute Ssm\n");
-		// 	break;
-		// case Rsm:
-		// 	fprintf(stderr, "execute Rsm\n");
-		// 	break;
+		case Ssm:
+		 	fprintf(stderr, "execute Ssm\n");
+			RUN_Return = Shift_Instruction(cpub);
+			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: Shift Instruction\n");
+		 	break;
+		case Rsm:
+		 	fprintf(stderr, "execute Rsm\n");
+			RUN_Return = Rotate_Instruction(cpub);
+			if(RUN_Return == RUN_HALT) fprintf(stderr, "Failed: Rotate Instruction\n");
+			break;
 		case LD:
 			fprintf(stderr, "execute LD\n");
 			RUN_Return = LD_Instruction(cpub);
@@ -805,11 +811,80 @@ int CMP_Instruction(Cpub *cpub){
 	}
 
 	OF = (A & B & (~C)) | ((~A) & (~B) & C);
+	Write_A_Value(cpub, ALU_result);
 	Set_Flags(cpub, cpub->cf, OF, ALU_result);
 	return RUN_STEP;
 }
+int Shift_Instruction(Cpub *cpub){
+	Uword A_value = Set_A_Value("Shift", cpub);
+	Uword ALU_result;
+	Bit CF;				/* Carry Flag */
+	Bit OF = 0;			/* Over Flow Flag */
+	Bit A_MSB;				/* A_MSB:A_valueのMSB or 第6ビット(LA) */
+	
+	switch(ShiftMode){
+		case(RA):
+			CF = A_value & 0b00000001;
+			A_MSB = A_value & 0b10000000 >> 7;
+			ALU_result = (A_value >> 1) + A_MSB;
+			break;
+		case(LA):
+			CF = A_value & 0b10000000 >> 7;
+			OF = A_value & 0b10000000 >> 7;
+			ALU_result = A_value << 1;
+			break;
+		case(RL):
+			CF = A_value & 0b00000001;
+			ALU_result = A_value >> 1;
+			break;
+		case(LL):
+			CF = A_value & 0b10000000 >> 7;
+			ALU_result = A_value << 1;
+			break;
+		default:
+			fprintf(stderr,"Error: ShiftMode(%x) was not defined in Shift Instruction\n",ShiftMode);
+			return RUN_HALT;
+			break;
+	}
+	Write_A_Value(cpub, ALU_result);
+	Set_Flags(cpub,CF,OF,ALU_result);
+	return RUN_STEP;
+}
 
-int Bbc_Instruction(Cpub *cpub){
+int Rotate_Instruction(Cpub *cpub){
+	Uword A_value = Set_A_Value("Rotate", cpub);
+	Uword ALU_result;
+	Bit CF;				/* Carry Flag */
+	Bit OF = 0;			/* Over Flow Flag */
+	switch(ShiftMode){
+		case(RA):
+			CF = A_value & 0b00000001;
+			ALU_result = (A_value >> 1) + (CF << 7);
+			break;
+		case(LA):
+			CF = A_value & 0b10000000 >> 7;
+			OF = A_value & 0b10000000 >> 7;
+			ALU_result = (A_value << 1) + CF;
+			break;
+		case(RL):
+			CF = A_value & 0b00000001;
+			ALU_result = (A_value >> 1) + (CF << 7);
+			break;
+		case(LL):
+			CF = A_value & 0b10000000 >> 7;
+			ALU_result = (A_value << 1) + CF;
+			break;
+		default:
+			fprintf(stderr,"Error: ShiftMode(%x) was not defined in Rotate Instruction\n",ShiftMode);
+			return RUN_HALT;
+			break;
+	}
+	Write_A_Value(cpub, ALU_result);
+	Set_Flags(cpub,CF,OF,ALU_result);
+	return RUN_STEP;
+}
+
+int Branch_Instruction(Cpub *cpub){
 	Uword Second_word;
 	
 	/* P2 Phase */
@@ -923,11 +998,13 @@ Uword instruction_decoding(Uword ir){
 		break;
 
 	case 0x40:
-		// /* Ssm,Rsm */
-		// //下位3bit目を取り出す
-		// if((inst_code_lower4 & 0x04) == 0) Decode_Return = Ssm;
-		// else if((inst_code_lower4 & 0x04) == 4) Decode_Return = Rsm;
-		// break;
+		/* Ssm,Rsm */
+		/* 下位3bit目を取り出す */
+		if((inst_code_lower4 & 0x04) == 0) Decode_Return = Ssm;
+		else if((inst_code_lower4 & 0x04) == 4) Decode_Return = Rsm;
+		A_Instruction = inst_code_lower4 & 0x08;
+		ShiftMode = inst_code_lower4 & 0x03;
+		break;
 
 	case 0x60:
 		/* LD */
