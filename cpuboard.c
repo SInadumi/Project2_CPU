@@ -31,7 +31,7 @@ int Rotate_Instruction(Cpub *);											/* Rotation命令 */
 int Branch_Instruction(Cpub *);											/* 分岐命令 */
 int JAL_Instruction(Cpub *);											/* JAL命令 */
 Uword instruction_decoding(Uword ir);									/* 命令解読機構 */
-Uword Set_A_Value(char *Instruction_name, Cpub *);						/* A値のセット */
+Uword Set_A_Value(Cpub *);						/* A値のセット */
 void Write_A_Value(Cpub *cpub, Uword ALU_result);						/* ACC or IX に処理結果を書き込む */
 void Set_Flags(Cpub *cpub, Bit Carry, Bit Over, Uword ALU_result);		/* CF,VF,NF,ZF のセット */
 
@@ -229,7 +229,7 @@ int LD_Instruction(Cpub *cpub){
 
 int ST_Instruction(Cpub *cpub){	
 	Uword Second_word;
-	Uword A_Value = Set_A_Value("ST", cpub);		/* 1 -> IX, 0 -> ACC */
+	Uword A_Value = Set_A_Value(cpub);		/* 1 -> IX, 0 -> ACC */
 
 	/* P2 Phase */
 	cpub->mar = cpub->pc;
@@ -269,7 +269,7 @@ int ST_Instruction(Cpub *cpub){
 
 int ADD_Instruction(Cpub *cpub){
 	Uword Second_word;
-	Uword A_Value = Set_A_Value("ADD", cpub);
+	Uword A_Value = Set_A_Value(cpub);
 	Uword ALU_result;
 	Bit OF;			/* Over Flow Flag */
 	Bit A,B,C;		/* A:第1OPのMSB B:第2OPのMSB C:ALU_resultのMSB */
@@ -342,7 +342,7 @@ int ADD_Instruction(Cpub *cpub){
 }
 int ADC_Instruction(Cpub *cpub){
 	Uword Second_word;
-	Uword A_Value = Set_A_Value("ADC", cpub);
+	Uword A_Value = Set_A_Value(cpub);
 	Uword ALU_result;
 	Bit CF,OF;			/* Carry Flag, Over Flow Flag */
 	Bit A,B,C;			/* A:第1OPのMSB B:第2OPのMSB C:ALU_resultのMSB */
@@ -437,7 +437,7 @@ int ADC_Instruction(Cpub *cpub){
 
 int SUB_Instruction(Cpub *cpub){
 	Uword Second_word;
-	Uword A_Value = Set_A_Value("SUB", cpub);
+	Uword A_Value = Set_A_Value(cpub);
 	Uword ALU_result;
 	Bit OF;			/* Over Flow Flag */
 	Bit A,B,C;		/* A:第1OPのMSB B:第2OPのMSB C:ALU_resultのMSB */
@@ -511,7 +511,7 @@ int SUB_Instruction(Cpub *cpub){
 
 int SBC_Instruction(Cpub *cpub){
 	Uword Second_word;
-	Uword A_Value = Set_A_Value("SBC", cpub);
+	Uword A_Value = Set_A_Value(cpub);
 	Uword ALU_result;
 	Bit CF,OF;			/* Carry Flag, Over Flow Flag */
 	Bit A,B,C;			/* A:第1OPのMSB B:第2OPのMSB C:ALU_resultのMSB */
@@ -606,7 +606,7 @@ int SBC_Instruction(Cpub *cpub){
 
 int AND_Instruction(Cpub *cpub){
 	Uword Second_word;
-	Uword A_Value = Set_A_Value("AND", cpub);
+	Uword A_Value = Set_A_Value(cpub);
 	Uword ALU_result;
 
 	/* P2 Phase */
@@ -656,7 +656,7 @@ int AND_Instruction(Cpub *cpub){
 
 int OR_Instruction(Cpub *cpub){
 	Uword Second_word;
-	Uword A_Value = Set_A_Value("OR", cpub);
+	Uword A_Value = Set_A_Value(cpub);
 	Uword ALU_result;
 
 	/* P2 Phase */
@@ -706,7 +706,7 @@ int OR_Instruction(Cpub *cpub){
 
 int EOR_Instruction(Cpub *cpub){
 	Uword Second_word;
-	Uword A_Value = Set_A_Value("EOR", cpub);
+	Uword A_Value = Set_A_Value(cpub);
 	Uword ALU_result;
 
 	/* P2 Phase */
@@ -756,7 +756,7 @@ int EOR_Instruction(Cpub *cpub){
 
 int CMP_Instruction(Cpub *cpub){
 	Uword Second_word;
-	Uword A_Value = Set_A_Value("CMP", cpub);
+	Uword A_Value = Set_A_Value(cpub);
 	Uword ALU_result;
 	Bit OF;			/* Over Flow Flag */
 	Bit A,B,C;		/* A:第1OPのMSB B:第2OPのMSB C:ALU_resultのMSB */
@@ -828,7 +828,7 @@ int CMP_Instruction(Cpub *cpub){
 	return RUN_STEP;
 }
 int Shift_Instruction(Cpub *cpub){
-	Uword A_value = Set_A_Value("Shift", cpub);
+	Uword A_value = Set_A_Value(cpub);
 	Uword ALU_result;
 	Bit CF;				/* Carry Flag */
 	Bit OF = 0;			/* Over Flow Flag */
@@ -864,7 +864,7 @@ int Shift_Instruction(Cpub *cpub){
 }
 
 int Rotate_Instruction(Cpub *cpub){
-	Uword A_value = Set_A_Value("Rotate", cpub);
+	Uword A_value = Set_A_Value(cpub);
 	Uword ALU_result;
 	Bit CF;				/* Carry Flag */
 	Bit OF = 0;			/* Over Flow Flag */
@@ -1112,12 +1112,8 @@ Uword instruction_decoding(Uword ir){
 	return Decode_Return;
 }
 
-Uword Set_A_Value(char *Instruction_name, Cpub *cpub){
+Uword Set_A_Value(Cpub *cpub){
 	Uword Withdraw_value;
-	if(strcmp(Instruction_name,"ST") == 0 && A_Instruction == 1){
-		fprintf(stderr, "Warning: ST isn't allowed setting 'Instruction_A = 0'");
-		A_Instruction = 0;
-	}
 	if(A_Instruction == 0){
 		Withdraw_value = cpub->acc;
 	}else{
