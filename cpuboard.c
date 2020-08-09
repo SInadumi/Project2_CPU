@@ -512,15 +512,10 @@ int SUB_Instruction(Cpub *cpub){
 int SBC_Instruction(Cpub *cpub){
 	Uword Second_word;
 	Uword A_Value = Set_A_Value(cpub);
+	Uword B_Value;
 	Uword ALU_result;
 	Bit CF,OF;			/* Carry Flag, Over Flow Flag */
 	Bit A,B,C;			/* A:第1OPのMSB B:第2OPのMSB C:ALU_resultのMSB */
-	/* 
-	 *	Except_MSB_OP1:MSBを除いた第1OP
-	 *  Except_MSB_OP2:MSBを除いた第2OP
-	 */
-	Uword Except_MSB_OP1,Except_MSB_OP2;
-	Bit CY;				/* CY:MSBよりも一つ低いビットからの桁上がり */
 
 	/* P2 Phase */
 	if(!(B_Instruction == ACC) && !(B_Instruction == IX)){
@@ -533,71 +528,64 @@ int SBC_Instruction(Cpub *cpub){
 	{
 		case ACC:
 			ALU_result = A_Value - cpub->acc - cpub->cf;
+			B_Value = cpub->acc - cpub->cf;
 			A = A_Value >> 7;
 			B = cpub->acc >> 7;
 			C = ALU_result >> 7;
-			Except_MSB_OP1 = A_Value & 0b1111111;
-			Except_MSB_OP2 = cpub->acc & 0b1111111;
 			break;
 		case IX:
 			ALU_result = A_Value - cpub->ix - cpub->cf;
+			B_Value = cpub->ix - cpub->cf;
 			A = A_Value >> 7;
 			B = cpub->ix >> 7;
 			C = ALU_result >> 7;
-			Except_MSB_OP1 = A_Value & 0b1111111;
-			Except_MSB_OP2 = cpub->ix & 0b1111111;
 			break;
 		case Immediate_d:
 			ALU_result = A_Value - Second_word - cpub->cf;
+			B_Value = Second_word - cpub->cf;
 			A = A_Value >> 7;
 			B = Second_word >> 7;
 			C = ALU_result >> 7;
-			Except_MSB_OP1 = A_Value & 0b1111111;
-			Except_MSB_OP2 = Second_word & 0b1111111;
 			break;
 		case Program_Absolute_d:
 			cpub->mar = Second_word;
 			ALU_result = A_Value - cpub->mem[0x000+cpub->mar] - cpub->cf;
+			B_Value = cpub->mem[0x000+cpub->mar] - cpub->cf;
 			A = A_Value >> 7;
 			B = cpub->mem[0x000+cpub->mar] >> 7;
 			C = ALU_result >> 7;
-			Except_MSB_OP1 = A_Value & 0b1111111;
-			Except_MSB_OP2 = cpub->mem[0x000+cpub->mar] & 0b1111111;
 			break;
 		case Data_Absolute_d:
 			cpub->mar = Second_word;
 			ALU_result = A_Value - cpub->mem[0x100+cpub->mar] - cpub->cf;
+			B_Value = cpub->mem[0x100+cpub->mar] - cpub->cf;
 			A = A_Value >> 7;
 			B = cpub->mem[0x100+cpub->mar] >> 7;
 			C = ALU_result >> 7;
-			Except_MSB_OP1 = A_Value & 0b1111111;
-			Except_MSB_OP2 = cpub->mem[0x100+cpub->mar] & 0b1111111;
 			break;
 		case Program_IX:
 			cpub->mar = Second_word + cpub->ix;
 			ALU_result = A_Value - cpub->mem[0x000+cpub->mar] - cpub->cf;
+			B_Value = cpub->mem[0x000+cpub->mar] - cpub->cf;
 			A = A_Value >> 7;
 			B = cpub->mem[0x000+cpub->mar] >> 7;
 			C = ALU_result >> 7;
-			Except_MSB_OP1 = A_Value & 0b1111111;
-			Except_MSB_OP2 = cpub->mem[0x000+cpub->mar] & 0b1111111;
 			break;
 		case Data_IX:
 			cpub->mar = Second_word + cpub->ix;
 			ALU_result = A_Value - cpub->mem[0x100+cpub->mar] - cpub->cf;
+			B_Value = cpub->mem[0x100+cpub->mar] - cpub->cf;
 			A = A_Value >> 7;
 			B = cpub->mem[0x100+cpub->mar] >> 7;
 			C = ALU_result >> 7;
-			Except_MSB_OP1 = A_Value & 0b1111111;
-			Except_MSB_OP2 = cpub->mem[0x100+cpub->mar] & 0b1111111;
 			break;
 		default:
 			fprintf(stderr,"Error: OP_B(%x) was not defined in SBC Instruction\n",B_Instruction);
 			return RUN_HALT;
 			break;
 	}
-	CY = (Except_MSB_OP1 + Except_MSB_OP2) >> 7;
-	CF = (A & B) | (A & CY) | (B & CY);
+	if(B_Value > A_Value) CF = 0x01;
+	else CF = 0x00;
 	OF = (A & B & (~C)) | ((~A) & (~B) & C);
 	Write_A_Value(cpub, ALU_result);
 	Set_Flags(cpub, CF, OF, ALU_result);
