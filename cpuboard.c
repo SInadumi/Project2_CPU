@@ -811,7 +811,7 @@ int CMP_Instruction(Cpub *cpub){
 	}
 
 	OF = (A & B & (~C)) | ((~A) & (~B) & C);
-	Write_A_Value(cpub, ALU_result);
+	//Write_A_Value(cpub, ALU_result);
 	Set_Flags(cpub, cpub->cf, OF, ALU_result);
 	return RUN_STEP;
 }

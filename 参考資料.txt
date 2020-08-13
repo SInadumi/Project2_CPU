@@ -1,0 +1,4 @@
+[1] 第2回ASICデザインコンテスト規定課題「8ビットマイクロプロセッサKUE-CHIP2」
+http://www-lab09.kuee.kyoto-u.ac.jp/parthenon/lecture/95/kadai.htm
+[2] キャリーフラグとオーバーフロー
+https://donkeyhacks.zouri.jp/databank/65C816/function/carry.html
